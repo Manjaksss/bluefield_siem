@@ -5,18 +5,21 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import Response
-from app import crud, database, models
+from app import crud, models, database
 import os
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+# Database setup
+engine = database.engine
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY', 'your-secret-key'))
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
-
-@app.on_event("startup")
-async def startup():
-    database.create_tables()
 
 @app.get("/", response_class=HTMLResponse)
 async def login_page(request: Request):
