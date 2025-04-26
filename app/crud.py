@@ -1,38 +1,36 @@
 
-from app import database, models
-from collections import Counter
-from datetime import datetime, timedelta
+from app.database import SessionLocal
+from app import models
 
-db = database.SessionLocal()
-
-def create_event(router_name, source_ip, event_type, description):
+def insert_event(router_name: str, source_ip: str, event_type: str, description: str):
+    db = SessionLocal()
     event = models.Event(
         router_name=router_name,
         source_ip=source_ip,
         event_type=event_type,
-        description=description
+        description=description,
     )
     db.add(event)
     db.commit()
     db.refresh(event)
-    return event
+    db.close()
 
 def get_events():
-    return db.query(models.Event).order_by(models.Event.timestamp.desc()).all()
+    db = SessionLocal()
+    events = db.query(models.Event).order_by(models.Event.timestamp.desc()).all()
+    db.close()
+    return events
 
-def get_stats():
-    events = db.query(models.Event).all()
-    router_counter = Counter([event.router_name for event in events])
+def get_stats(events):
+    stats = {}
+    routers = {}
+    total = 0
 
-    now = datetime.utcnow()
-    week_ago = now - timedelta(days=7)
-    month_ago = now - timedelta(days=30)
+    for event in events:
+        routers.setdefault(event.router_name, 0)
+        routers[event.router_name] += 1
+        total += 1
 
-    weekly_count = db.query(models.Event).filter(models.Event.timestamp >= week_ago).count()
-    monthly_count = db.query(models.Event).filter(models.Event.timestamp >= month_ago).count()
-
-    return {
-        "router_counter": router_counter,
-        "weekly_count": weekly_count,
-        "monthly_count": monthly_count
-    }
+    stats['total_events'] = total
+    stats['events_per_router'] = routers
+    return stats
