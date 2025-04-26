@@ -1,39 +1,43 @@
 
 from fastapi import FastAPI, Request, Form, status
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import Response
 from app import crud, database, models
 import os
 
 app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY', 'your-secret-key'))
 
-# Secret key for sessions
-app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "supersecretkey"))
-
-templates = Jinja2Templates(directory="app/templates")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+templates = Jinja2Templates(directory="app/templates")
 
-models.Base.metadata.create_all(bind=database.engine)
+@app.on_event("startup")
+async def startup():
+    database.create_tables()
 
 @app.get("/", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
-@app.post("/login", response_class=HTMLResponse)
+@app.post("/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
-    if username == os.getenv("ADMIN_USERNAME", "admin") and password == os.getenv("ADMIN_PASSWORD", "password"):
-        request.session["user"] = username
+    admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
+    admin_password = os.environ.get('ADMIN_PASSWORD', 'password')
+    if username == admin_username and password == admin_password:
+        request.session['user'] = username
         return RedirectResponse("/dashboard", status_code=status.HTTP_302_FOUND)
     return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials"})
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    if "user" not in request.session:
+    user = request.session.get('user')
+    if not user:
         return RedirectResponse("/", status_code=status.HTTP_302_FOUND)
     events = crud.get_events()
-    stats = crud.get_stats()
+    stats = crud.get_stats(events)
     return templates.TemplateResponse("index.html", {"request": request, "events": events, "stats": stats})
 
 @app.get("/logout")
@@ -42,6 +46,28 @@ async def logout(request: Request):
     return RedirectResponse("/", status_code=status.HTTP_302_FOUND)
 
 @app.post("/event")
-async def receive_event(router_name: str, source_ip: str, event_type: str, description: str):
-    crud.create_event(router_name, source_ip, event_type, description)
-    return {"message": "Event received successfully"}
+async def receive_event(request: Request):
+    try:
+        content_type = request.headers.get('content-type', '')
+        if 'application/json' in content_type:
+            data = await request.json()
+        elif 'application/x-www-form-urlencoded' in content_type:
+            form = await request.form()
+            data = {
+                "router_name": form.get("Site") or form.get("router_name"),
+                "source_ip": form.get("WAN") or form.get("source_ip"),
+                "event_type": form.get("Description") or form.get("event_type"),
+                "description": f"Time: {form.get('Time')}" if form.get('Time') else form.get("description"),
+            }
+        else:
+            return {"error": "Unsupported Content-Type"}
+
+        crud.insert_event(
+            router_name=data.get("router_name", "Unknown Router"),
+            source_ip=data.get("source_ip", "0.0.0.0"),
+            event_type=data.get("event_type", "Unknown Event"),
+            description=data.get("description", "No Description"),
+        )
+        return {"status": "Event received"}
+    except Exception as e:
+        return {"error": str(e)}
