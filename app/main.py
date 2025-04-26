@@ -12,8 +12,10 @@ app.add_middleware(
     SessionMiddleware,
     secret_key="x9v82n4fpbq7s2rj1k4d6lzn8m0a3v5t7q2b9r1y6u4c0x3m8p5z7l1d6b2q0w9s",
     same_site="lax",
-    https_only=False
+    https_only=False,
+    session_cookie="bluefield_session"
 )
+
 
 templates = Jinja2Templates(directory="app/templates")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
