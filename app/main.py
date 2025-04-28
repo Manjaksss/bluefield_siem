@@ -72,6 +72,7 @@ async def logout(request: Request):
 async def receive_event(request: Request):
     try:
         payload = await request.json()
+        print("DEBUG - Payload received:", payload)  # 🔥 ADD THIS LINE
         router_name = payload.get("router_name", "Unknown")
         source_ip = payload.get("source_ip", "Unknown")
         event_type = payload.get("event_type", "Intrusion Attempt")
@@ -79,6 +80,7 @@ async def receive_event(request: Request):
         crud.insert_event(router_name, source_ip, event_type, description)
         return {"message": "Event received successfully"}
     except Exception as e:
+        print("DEBUG - Error receiving event:", str(e))  # 🔥 OPTIONAL EXTRA LINE
         return {"error": str(e)}
 
 @app.get("/download_csv")
