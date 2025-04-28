@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Form, status
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from app import crud, database, models
@@ -72,16 +72,18 @@ async def logout(request: Request):
 async def receive_event(request: Request):
     try:
         payload = await request.json()
-        print("DEBUG - Payload received:", payload)  # 🔥 ADD THIS LINE
-        router_name = payload.get("router_name", "Unknown")
-        source_ip = payload.get("source_ip", "Unknown")
-        event_type = payload.get("event_type", "Intrusion Attempt")
-        description = payload.get("description", "No description provided")
+        
+        router_name = payload.get("router_name", "Unknown") or "Unknown"
+        source_ip = payload.get("source_ip", "Unknown") or "Unknown"
+        event_type = payload.get("event_type", "Unknown") or "Unknown"
+        description = payload.get("description", "No description provided") or "No description provided"
+
         crud.insert_event(router_name, source_ip, event_type, description)
         return {"message": "Event received successfully"}
+    
     except Exception as e:
-        print("DEBUG - Error receiving event:", str(e))  # 🔥 OPTIONAL EXTRA LINE
-        return {"error": str(e)}
+        print(f"DEBUG - Error receiving event: {e}")
+        return JSONResponse(status_code=400, content={"error": "Invalid event format"})
 
 @app.get("/download_csv")
 async def download_csv(request: Request):
