@@ -1,21 +1,29 @@
-
 from fastapi import FastAPI, Request, Form, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from app import crud, database, models
 from fastapi.staticfiles import StaticFiles
 from datetime import datetime
+import csv
+import io
+
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 app = FastAPI()
 app.add_middleware(
     SessionMiddleware,
-    secret_key="x9v82n4fpbq7s2rj1k4d6lzn8m0a3v5t7q2b9r1y6u4c0x3m8p5z7l1d6b2q0w9s",
+    secret_key=SECRET_KEY,
     same_site="lax",
-    https_only=False,
-    session_cookie="bluefield_session"
+    https_only=False
 )
-
 
 templates = Jinja2Templates(directory="app/templates")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -30,7 +38,7 @@ async def login_page(request: Request):
 
 @app.post("/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
-    if username == "admin" and password == "admin":
+    if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
         request.session["user"] = username
         return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
     return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
@@ -39,9 +47,21 @@ async def login(request: Request, username: str = Form(...), password: str = For
 async def dashboard(request: Request):
     if not request.session.get("user"):
         return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    
     events = crud.get_events()
     stats = crud.get_stats(events)
-    return templates.TemplateResponse("index.html", {"request": request, "events": events, "stats": stats})
+    
+    return templates.TemplateResponse(
+        "index.html", 
+        {
+            "request": request,
+            "events": events,
+            "total_events": stats["total_events"],
+            "router_counter": stats["router_counter"],
+            "event_type_counter": stats["event_type_counter"],
+        }
+    )
+
 
 @app.get("/logout")
 async def logout(request: Request):
@@ -60,3 +80,32 @@ async def receive_event(request: Request):
         return {"message": "Event received successfully"}
     except Exception as e:
         return {"error": str(e)}
+
+@app.get("/download_csv")
+async def download_csv(request: Request):
+    if not request.session.get("user"):
+        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+    events = crud.get_events()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Router Name", "Source IP", "Event Type", "Description", "Timestamp"])
+
+    for event in events:
+        writer.writerow([
+            event.router_name,
+            event.source_ip,
+            event.event_type,
+            event.description,
+            event.timestamp
+        ])
+
+    output.seek(0)
+    filename = f"events_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )

@@ -1,16 +1,13 @@
-
 from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.ext.declarative import declarative_base
+from app.database import Base
 from datetime import datetime
-
-Base = declarative_base()
 
 class Event(Base):
     __tablename__ = "events"
 
     id = Column(Integer, primary_key=True, index=True)
-    router_name = Column(String)
-    source_ip = Column(String)
-    event_type = Column(String)
-    description = Column(String)
+    router_name = Column(String, nullable=False)
+    source_ip = Column(String, nullable=False)
+    event_type = Column(String, nullable=False)
+    description = Column(String, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow)

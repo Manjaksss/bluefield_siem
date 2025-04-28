@@ -1,34 +1,35 @@
+# Bluefield SIEM
 
-# Bluefield SIEM (Updated for Python 3.13)
+**Bluefield SIEM** is a lightweight security event monitoring dashboard designed for receiving and analyzing HTTP notifications from Teltonika routers and similar devices.
 
-## Local Development
+---
 
-1. Install dependencies:
+## 🔥 Features
 
-    .\venv\Scripts\python.exe -m pip install -r requirements.txt
+- Secure login system (admin / admin)
+- Event reception from routers via HTTP POST
+- Dashboard displaying:
+  - Event log
+  - Intrusion statistics
+  - Pie chart of router activity
+  - Search and filter by Router Name and Event Type
+- Download event log as CSV with date
+- Clean corporate UI with live charts
+- Simple deployment on Render or local PC
 
-2. Run the app:
+---
 
-    .\venv\Scripts\python.exe -m uvicorn app.main:app --reload
+## 🎯 Login Credentials
 
-Access on: http://localhost:8000
+| Username | Password |
+|:--------|:---------|
+| `admin` | `admin` |
 
-## Deploy to Render.com
+---
 
-1. Create GitHub repo and push the code.
-2. Connect Render.com to GitHub.
-3. Set environment variables:
-   - SECRET_KEY
-   - ADMIN_USERNAME
-   - ADMIN_PASSWORD
-4. Deploy!
+## 🚀 How to Run Locally
 
-POST events to:
-
-    POST https://your-app-url/event
-    {
-      "router_name": "Router1",
-      "source_ip": "192.168.1.1",
-      "event_type": "Intrusion",
-      "description": "Attempt to access the router"
-    }
+1. Install Python 3.10+.
+2. Clone the repository:
+   ```bash
+   git clone https://github.com/YourUsername/bluefield_siem.git

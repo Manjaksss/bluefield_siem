@@ -1,114 +1,143 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Bluefield SIEM Dashboard</title>
-    <script src="/static/chart.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f8f9fa;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1200px;
-            margin: auto;
-        }
-        .card {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        th {
-            background-color: #f1f1f1;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- Real Chart.js from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
         <h1>Bluefield SIEM Dashboard</h1>
-        <a href="/logout">Logout</a>
+        <p><strong>Total Events:</strong> {{ total_events }}</p>
 
-        <div class="card">
-            <h2>Intrusion Statistics</h2>
-            <p>Total Events: {{ stats.total_events }}</p>
-            <canvas id="routerChart" width="400" height="200"></canvas>
+
+        <div class="charts">
+            <div class="chart-container">
+                <h3>Intrusion Types</h3>
+                <canvas id="pieChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>Events Per Router</h3>
+                <canvas id="barChart"></canvas>
+            </div>
+        </div>
+
+        <div class="buttons">
+            <a href="/download_csv" class="btn">Download CSV</a>
+            <a href="/logout" class="btn">Logout</a>
+        </div>
+
+        <div class="filters">
+            <input type="text" id="routerFilter" placeholder="Filter by Router Name">
+            <input type="text" id="eventTypeFilter" placeholder="Filter by Event Type">
+            <button onclick="applyFilters()">Apply Filters</button>
         </div>
 
         <div class="card">
             <h2>Event Log</h2>
-            <table>
-                <tr>
-                    <th>Router Name</th>
-                    <th>Source IP</th>
-                    <th>Event Type</th>
-                    <th>Description</th>
-                    <th>Timestamp</th>
-                </tr>
-                {% for event in events %}
-                <tr>
-                    <td>{{ event.router_name }}</td>
-                    <td>{{ event.source_ip }}</td>
-                    <td>{{ event.event_type }}</td>
-                    <td>{{ event.description }}</td>
-                    <td>{{ event.timestamp }}</td>
-                </tr>
-                {% endfor %}
+            <table id="eventsTable">
+                <thead>
+                    <tr>
+                        <th>Router Name</th>
+                        <th>Source IP</th>
+                        <th>Event Type</th>
+                        <th>Description</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in events %}
+                    <tr>
+                        <td>{{ event.router_name }}</td>
+                        <td>{{ event.source_ip }}</td>
+                        <td>{{ event.event_type }}</td>
+                        <td>{{ event.description }}</td>
+                        <td>{{ event.timestamp }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
             </table>
         </div>
     </div>
 
     <script>
-        const routerData = {{ stats.events_per_router | tojson }};
+        // Receive data from FastAPI
+        const routerData = {{ router_counter | tojson }};
+const eventTypeData = {{ event_type_counter | tojson }};
 
-        const ctx = document.getElementById('routerChart').getContext('2d');
-        const routerChart = new Chart(ctx, {
+
+
+        // PIE CHART
+        const pieCtx = document.getElementById('pieChart').getContext('2d');
+        new Chart(pieCtx, {
             type: 'pie',
+            data: {
+                labels: Object.keys(eventTypeData),
+                datasets: [{
+                    data: Object.values(eventTypeData),
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.6)',
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(255, 206, 86, 0.6)',
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(153, 102, 255, 0.6)',
+                        'rgba(255, 159, 64, 0.6)'
+                    ]
+                }]
+            }
+        });
+
+        // BAR CHART
+        const barCtx = document.getElementById('barChart').getContext('2d');
+        new Chart(barCtx, {
+            type: 'bar',
             data: {
                 labels: Object.keys(routerData),
                 datasets: [{
                     label: 'Events per Router',
                     data: Object.values(routerData),
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.2)',
-                        'rgba(54, 162, 235, 0.2)',
-                        'rgba(255, 206, 86, 0.2)',
-                        'rgba(75, 192, 192, 0.2)',
-                        'rgba(153, 102, 255, 0.2)',
-                        'rgba(255, 159, 64, 0.2)'
-                    ],
-                    borderColor: [
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(255, 206, 86, 1)',
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(153, 102, 255, 1)',
-                        'rgba(255, 159, 64, 1)'
-                    ],
-                    borderWidth: 1
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)'
                 }]
             },
             options: {
                 responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    },
+                indexAxis: 'x',
+                scales: {
+                    x: {
+                        ticks: {
+                            maxRotation: 90,
+                            minRotation: 45,
+                            autoSkip: false,
+                        }
+                    }
                 }
             }
         });
+
+        // FILTERS
+        function applyFilters() {
+            const routerInput = document.getElementById('routerFilter').value.toLowerCase();
+            const eventTypeInput = document.getElementById('eventTypeFilter').value.toLowerCase();
+            const table = document.getElementById('eventsTable');
+            const rows = table.getElementsByTagName('tr');
+
+            for (let i = 1; i < rows.length; i++) {
+                let routerCell = rows[i].getElementsByTagName('td')[0];
+                let eventTypeCell = rows[i].getElementsByTagName('td')[2];
+                if (routerCell && eventTypeCell) {
+                    let routerText = routerCell.textContent.toLowerCase();
+                    let eventTypeText = eventTypeCell.textContent.toLowerCase();
+                    if (routerText.includes(routerInput) && eventTypeText.includes(eventTypeInput)) {
+                        rows[i].style.display = "";
+                    } else {
+                        rows[i].style.display = "none";
+                    }
+                }
+            }
+        }
     </script>
+
 </body>
 </html>
