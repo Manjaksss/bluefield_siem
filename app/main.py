@@ -71,7 +71,7 @@ async def logout(request: Request):
 @app.post("/event")
 async def receive_event(request: Request):
     try:
-        payload = await request.json()
+        payload = await request.form()
         
         router_name = payload.get("router_name", "Unknown") or "Unknown"
         source_ip = payload.get("source_ip", "Unknown") or "Unknown"
