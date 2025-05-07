@@ -16,6 +16,7 @@ load_dotenv()
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 SECRET_KEY = os.getenv("SECRET_KEY")
+EVENT_SECRET = os.getenv("EVENT_SECRET")
 
 app = FastAPI()
 app.add_middleware(
@@ -73,6 +74,10 @@ async def receive_event(request: Request):
     try:
         payload = await request.form()
         
+        token = payload.get("token")
+        if token != EVENT_SECRET:
+            return JSONResponse(status_code=403, content={"error": "Invalid token"})
+            
         router_name = payload.get("router_name", "Unknown") or "Unknown"
         source_ip = payload.get("source_ip", "Unknown") or "Unknown"
         event_type = payload.get("event_type", "Unknown") or "Unknown"
